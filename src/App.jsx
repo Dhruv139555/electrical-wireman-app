@@ -93,8 +93,8 @@ export default function App() {
   const [estimatorPreload, setEstimatorPreload] = useState(null); // preloaded state from estimator convert
 
   // Supabase Sync States
-  const [supabaseUrl, setSupabaseUrl] = useState(import.meta.env?.VITE_SUPABASE_URL || '');
-  const [supabaseKey, setSupabaseKey] = useState(import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || '');
+  const [supabaseUrl, setSupabaseUrl] = useState(import.meta.env?.VITE_SUPABASE_URL || 'https://ivrmxblrjbnswhwjougt.supabase.co');
+  const [supabaseKey, setSupabaseKey] = useState(import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1seyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1s');
   const [syncStatus, setSyncStatus] = useState('offline');
 
   // Auth States
@@ -226,8 +226,8 @@ export default function App() {
 
   // Helper to load credentials dynamically
   const getSupabaseCredentials = () => {
-    const url = supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || '';
-    const key = supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || '';
+    const url = supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || 'https://ivrmxblrjbnswhwjougt.supabase.co';
+    const key = supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1seyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1s';
     return { url, key };
   };
 
@@ -368,8 +368,8 @@ export default function App() {
       }
     }
 
-    const url = savedUrl || import.meta.env?.VITE_SUPABASE_URL;
-    const key = savedKey || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY;
+    const url = savedUrl || import.meta.env?.VITE_SUPABASE_URL || 'https://ivrmxblrjbnswhwjougt.supabase.co';
+    const key = savedKey || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1seyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1s';
     if (url && key) {
       triggerInitialSync(url, key, activeUserId);
     }
