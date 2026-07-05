@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import InvoiceForm from './components/InvoiceForm';
@@ -484,6 +485,7 @@ export default function App() {
       companyName={companyProfile.name}
     >
       {renderTabContent()}
+      <Analytics />
     </Layout>
   );
 }
