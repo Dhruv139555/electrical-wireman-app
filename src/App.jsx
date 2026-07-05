@@ -308,6 +308,25 @@ export default function App() {
     }
   };
 
+  const handleGoogleSignIn = (customUrl = null, customKey = null) => {
+    if (customUrl && customKey) {
+      setSupabaseUrl(customUrl);
+      setSupabaseKey(customKey);
+      localStorage.setItem('wireman_supabase_url', customUrl);
+      localStorage.setItem('wireman_supabase_key', customKey);
+    }
+    const creds = {
+      url: customUrl || supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || 'https://ivrmxblrjbnswhwjougt.supabase.co',
+      key: customKey || supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1seyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1s'
+    };
+    if (!creds.url || !creds.key) {
+      setAuthError('Supabase project URL and API key are not configured.');
+      return;
+    }
+    const redirectUrl = encodeURIComponent(window.location.origin);
+    window.location.href = `${creds.url.replace(/\/$/, '')}/auth/v1/authorize?provider=google&redirect_to=${redirectUrl}`;
+  };
+
   const handleSignOut = async () => {
     const creds = getSupabaseCredentials();
     const sessionStr = localStorage.getItem('wireman_supabase_session');
@@ -353,6 +372,51 @@ export default function App() {
     if (savedUrl) setSupabaseUrl(savedUrl);
     if (savedKey) setSupabaseKey(savedKey);
     
+    // Check if there is an OAuth redirect hash in the URL (from Google Sign-In)
+    if (window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      const expiresAt = params.get('expires_at');
+      
+      if (accessToken) {
+        const url = savedUrl || import.meta.env?.VITE_SUPABASE_URL || 'https://ivrmxblrjbnswhwjougt.supabase.co';
+        const key = savedKey || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1seyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1s';
+        
+        setAuthLoading(true);
+        import('./utils/syncService').then(async ({ getUser }) => {
+          const userRes = await getUser(url, key, accessToken);
+          if (userRes.success) {
+            const user = userRes.user;
+            setCurrentUser(user);
+            localStorage.setItem('wireman_supabase_session', JSON.stringify({
+              user,
+              session: {
+                access_token: accessToken,
+                refresh_token: refreshToken,
+                expires_at: expiresAt
+              }
+            }));
+            // Clean up URL hash cleanly
+            window.history.replaceState(null, null, window.location.pathname);
+            triggerInitialSync(url, key, user.id);
+          } else {
+            console.error('Failed to fetch user after OAuth:', userRes.error);
+            setAuthError(userRes.error || 'Failed to authenticate Google user.');
+            setIsAuthOpen(true);
+          }
+          setAuthLoading(false);
+        }).catch(err => {
+          console.error('Exception fetching user after OAuth:', err);
+          setAuthError(err.message || 'Error processing Google session.');
+          setIsAuthOpen(true);
+          setAuthLoading(false);
+        });
+        return; // Skip loading standard saved session since we have a new active OAuth session
+      }
+    }
+
     // Load and verify auth session
     const savedSession = localStorage.getItem('wireman_supabase_session');
     let activeUserId = null;
@@ -779,6 +843,7 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         onLogin={handleLogin}
         onSignUp={handleSignUp}
+        onGoogleSignIn={handleGoogleSignIn}
         error={authError}
         loading={authLoading}
         supabaseUrl={supabaseUrl}

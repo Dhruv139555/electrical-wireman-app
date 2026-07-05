@@ -6,6 +6,7 @@ export default function Auth({
   onClose, 
   onLogin, 
   onSignUp, 
+  onGoogleSignIn,
   error, 
   loading,
   supabaseUrl = '',
@@ -25,6 +26,17 @@ export default function Auth({
   if (!isOpen) return null;
 
   const needsCredentials = !supabaseUrl || !supabaseKey;
+
+  const handleGoogleSubmit = () => {
+    setLocalError('');
+    if (needsCredentials && (!customUrl || !customKey)) {
+      setLocalError('Please configure your Supabase Project URL and Anon API key.');
+      return;
+    }
+    const finalUrl = supabaseUrl || customUrl;
+    const finalKey = supabaseKey || customKey;
+    onGoogleSignIn(finalUrl, finalKey);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -395,6 +407,45 @@ export default function Auth({
             )}
           </button>
         </form>
+
+        <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0', color: 'var(--text-muted)' }}>
+          <hr style={{ flexGrow: 1, border: 'none', borderTop: '1px solid var(--border-color)' }} />
+          <span style={{ fontSize: '0.75rem', padding: '0 10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>or</span>
+          <hr style={{ flexGrow: 1, border: 'none', borderTop: '1px solid var(--border-color)' }} />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogleSubmit}
+          className="btn"
+          style={{ 
+            width: '100%', 
+            padding: '0.75rem', 
+            fontWeight: 600, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            gap: '10px',
+            backgroundColor: '#fff',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-main)',
+            borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer',
+            transition: 'var(--transition)'
+          }}
+          disabled={loading}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+        >
+          {/* Inline Google SVG Logo */}
+          <svg width="18" height="18" viewBox="0 0 18 18" style={{ flexShrink: 0 }}>
+            <path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.47h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.91c1.71-1.57 2.69-3.88 2.69-6.6z"/>
+            <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.2l-2.91-2.26a5.64 5.64 0 0 1-8.52-2.96H.53v2.33A9 9 0 0 0 9 18z"/>
+            <path fill="#FBBC05" d="M3.53 10.58a5.41 5.41 0 0 1 0-3.16V5.09H.53a9 9 0 0 0 0 7.82l3-2.33z"/>
+            <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35L15 2.4A9 9 0 0 0 .53 5.09l3 2.33a5.64 5.64 0 0 1 8.52-3.84z"/>
+          </svg>
+          <span>Continue with Google</span>
+        </button>
 
         {/* Offline Disclaimer */}
         <div style={{ textAlign: 'center', marginTop: '1.25rem' }}>
