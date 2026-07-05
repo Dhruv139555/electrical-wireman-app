@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Settings, Save, Download, Upload, AlertCircle, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Save, Download, Upload, AlertCircle, FileText, User, RefreshCw, LogOut, CheckCircle } from 'lucide-react';
 
 export default function SettingsView({ 
   companyProfile = {}, 
@@ -7,7 +7,16 @@ export default function SettingsView({
   onImportData,
   onExportData,
   defaultTerms = [],
-  onSaveDefaultTerms
+  onSaveDefaultTerms,
+  // Sync settings props
+  supabaseUrl = '',
+  supabaseKey = '',
+  onSaveSyncCredentials,
+  syncStatus = 'offline',
+  currentUser = null,
+  onOpenAuth,
+  onSignOut,
+  onTriggerSync
 }) {
   // Company state
   const [name, setName] = useState(companyProfile.name || '');
@@ -26,6 +35,42 @@ export default function SettingsView({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [localTerms, setLocalTerms] = useState(defaultTerms || []);
+
+  // Sync state variables
+  const [syncUrl, setSyncUrl] = useState(supabaseUrl);
+  const [syncKey, setSyncKey] = useState(supabaseKey);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+
+  useEffect(() => {
+    setSyncUrl(supabaseUrl);
+    setSyncKey(supabaseKey);
+  }, [supabaseUrl, supabaseKey]);
+
+  const handleTestConnection = async () => {
+    if (!syncUrl || !syncKey) return;
+    setTestingConnection(true);
+    setTestResult(null);
+    try {
+      const { testSyncConnection } = await import('../utils/syncService');
+      const res = await testSyncConnection(syncUrl, syncKey);
+      setTestingConnection(false);
+      if (res.success) {
+        setTestResult({ success: true, message: 'Connection successful! Table "wireman_sync" is ready.' });
+      } else {
+        setTestResult({ success: false, message: `Connection failed: ${res.error}` });
+      }
+    } catch (err) {
+      setTestingConnection(false);
+      setTestResult({ success: false, message: `Connection failed: ${err.message}` });
+    }
+  };
+
+  const handleSaveSync = () => {
+    onSaveSyncCredentials(syncUrl, syncKey);
+    setMessage('Supabase credentials saved successfully! Syncing database...');
+    setTimeout(() => setMessage(''), 3000);
+  };
 
   const handleTermChange = (index, value) => {
     const updated = [...localTerms];
@@ -355,6 +400,187 @@ export default function SettingsView({
                   style={{ display: 'none' }} 
                 />
               </label>
+            </div>
+          </div>
+
+          {/* Cloud Sync Settings Card */}
+          <div className="card">
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Upload size={18} style={{ color: 'var(--primary)' }} />
+              Cloud Sync & Database Sync
+            </h3>
+            
+            {currentUser ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ 
+                  backgroundColor: '#ecfdf5', 
+                  border: '1px solid #a7f3d0', 
+                  borderRadius: 'var(--radius-sm)', 
+                  padding: '10px 12px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '8px'
+                }}>
+                  <div style={{ 
+                    backgroundColor: '#10b981', 
+                    color: '#fff', 
+                    borderRadius: '50%', 
+                    width: '20px', 
+                    height: '20px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    flexShrink: 0,
+                    marginTop: '2px'
+                  }}>✓</div>
+                  <div>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#065f46' }}>Connected to Cloud Sync</h4>
+                    <p style={{ fontSize: '0.75rem', color: '#047857', marginTop: '2px' }}>
+                      Logged in as: <strong style={{ wordBreak: 'break-all' }}>{currentUser.email}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    type="button" 
+                    onClick={onTriggerSync}
+                    className="btn btn-secondary btn-sm"
+                    style={{ flex: 1, fontSize: '0.8rem', display: 'inline-flex', gap: '6px', justifyContent: 'center' }}
+                  >
+                    Sync Now
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={onSignOut}
+                    className="btn btn-secondary btn-sm"
+                    style={{ flex: 1, fontSize: '0.8rem', display: 'inline-flex', gap: '6px', justifyContent: 'center', color: 'var(--danger)' }}
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1.25rem' }}>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                  Sign in or create a cloud account to automatically save your data and access it from any device or browser securely.
+                </p>
+                <button
+                  type="button"
+                  onClick={onOpenAuth}
+                  className="btn btn-primary"
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '8px 12px' }}
+                >
+                  Login or Create Account
+                </button>
+              </div>
+            )}
+
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+              <details style={{ fontSize: '0.8rem', cursor: 'pointer' }}>
+                <summary style={{ fontWeight: 600, color: 'var(--text-muted)' }}>
+                  Advanced Database Settings
+                </summary>
+                <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Provide a custom Supabase connection if you are self-hosting your database or running it without environment variables.
+                  </p>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Supabase Project URL</label>
+                    <input 
+                      type="text" 
+                      value={syncUrl} 
+                      onChange={(e) => setSyncUrl(e.target.value)} 
+                      className="form-control"
+                      style={{ fontSize: '0.8rem', padding: '6px 10px' }}
+                      placeholder="https://your-project.supabase.co"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Supabase Anon API Key</label>
+                    <input 
+                      type="password" 
+                      value={syncKey} 
+                      onChange={(e) => setSyncKey(e.target.value)} 
+                      className="form-control"
+                      style={{ fontSize: '0.8rem', padding: '6px 10px' }}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    />
+                  </div>
+
+                  {testResult && (
+                    <div style={{ 
+                      padding: '8px 12px', 
+                      borderRadius: '6px', 
+                      fontSize: '0.75rem', 
+                      backgroundColor: testResult.success ? '#ecfdf5' : '#fef2f2',
+                      color: testResult.success ? '#065f46' : '#991b1b',
+                      border: `1px solid ${testResult.success ? '#a7f3d0' : '#fca5a5'}`
+                    }}>
+                      {testResult.message}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between' }}>
+                    <button 
+                      type="button" 
+                      onClick={handleTestConnection} 
+                      disabled={testingConnection || !syncUrl || !syncKey}
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '0.8rem' }}
+                    >
+                      {testingConnection ? 'Testing...' : 'Test Connection'}
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={handleSaveSync} 
+                      disabled={!syncUrl || !syncKey}
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: '0.8rem' }}
+                    >
+                      Save & Connect
+                    </button>
+                  </div>
+                  
+                  <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+                    <details style={{ fontSize: '0.75rem', cursor: 'pointer' }}>
+                      <summary style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                        How to setup Supabase? (SQL Script)
+                      </summary>
+                      <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                        <p>1. Create a free project on <a href="https://supabase.com" target="_blank" rel="noopener noreferrer">supabase.com</a>.</p>
+                        <p>2. Open your project SQL Editor and run this query to create the sync table:</p>
+                        <pre style={{ 
+                          backgroundColor: 'var(--bg-app)', 
+                          padding: '8px', 
+                          borderRadius: '4px', 
+                          fontSize: '0.65rem', 
+                          overflowX: 'auto',
+                          border: '1px solid var(--border-color)',
+                          marginTop: '4px',
+                          fontFamily: 'monospace',
+                          cursor: 'text'
+                        }} onClick={(e) => e.stopPropagation()}>
+{`CREATE TABLE IF NOT EXISTS wireman_sync (
+  id text PRIMARY KEY,
+  data jsonb NOT NULL,
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE wireman_sync ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow anon read write" ON wireman_sync
+  FOR ALL USING (true) WITH CHECK (true);`}
+                        </pre>
+                        <p style={{ marginTop: '4px' }}>3. Copy the Project URL and Anon API key from Settings &gt; API and paste them above.</p>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
 

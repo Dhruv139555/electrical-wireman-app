@@ -7,6 +7,7 @@ import Estimator from './components/Estimator';
 import InventoryList from './components/InventoryList';
 import ClientList from './components/ClientList';
 import SettingsView from './components/Settings';
+import Auth from './components/Auth';
 
 import { 
   DEFAULT_COMPANY_PROFILE, 
@@ -91,6 +92,242 @@ export default function App() {
   const [viewingDoc, setViewingDoc] = useState(null);           // doc object or null
   const [estimatorPreload, setEstimatorPreload] = useState(null); // preloaded state from estimator convert
 
+  // Supabase Sync States
+  const [supabaseUrl, setSupabaseUrl] = useState(import.meta.env?.VITE_SUPABASE_URL || '');
+  const [supabaseKey, setSupabaseKey] = useState(import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || '');
+  const [syncStatus, setSyncStatus] = useState('offline');
+
+  // Auth States
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+
+  // Background Cloud Sync Trigger
+  const syncToCloud = async (id, data) => {
+    const creds = getSupabaseCredentials();
+    if (!creds.url || !creds.key) return;
+    setSyncStatus('syncing');
+    try {
+      const { pushSyncData } = await import('./utils/syncService');
+      const userId = currentUser ? currentUser.id : null;
+      const res = await pushSyncData(creds.url, creds.key, id, data, userId);
+      if (res.success) {
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('error');
+      }
+    } catch (err) {
+      console.error('Background sync failed:', err);
+      setSyncStatus('error');
+    }
+  };
+
+  const handleSaveSyncCredentials = (url, key) => {
+    setSupabaseUrl(url);
+    setSupabaseKey(key);
+    localStorage.setItem('wireman_supabase_url', url);
+    localStorage.setItem('wireman_supabase_key', key);
+    triggerInitialSync(url, key, currentUser?.id);
+  };
+
+  // Initial pull and merge function
+  async function triggerInitialSync(url, key, userId = null) {
+    if (!url || !key) {
+      setSyncStatus('offline');
+      return;
+    }
+    setSyncStatus('syncing');
+    try {
+      const { pullSyncData, pushSyncData, mergeCollection } = await import('./utils/syncService');
+      const res = await pullSyncData(url, key, userId);
+      
+      if (res.success) {
+        const remote = res.collections;
+        
+        // Merge and update companyProfile
+        let mergedProfile = companyProfile;
+        if (remote.companyProfile) {
+          mergedProfile = remote.companyProfile.data;
+          setCompanyProfile(mergedProfile);
+          localStorage.setItem('wireman_company_profile', JSON.stringify(mergedProfile));
+        } else {
+          await pushSyncData(url, key, 'companyProfile', companyProfile, userId);
+        }
+
+        // Merge and update materials
+        let localMaterials = JSON.parse(localStorage.getItem('wireman_materials') || '[]');
+        if (localMaterials.length === 0) localMaterials = DEFAULT_MATERIALS;
+        let mergedMaterials = localMaterials;
+        if (remote.materials) {
+          mergedMaterials = mergeCollection(localMaterials, remote.materials.data);
+          setMaterials(mergedMaterials);
+          localStorage.setItem('wireman_materials', JSON.stringify(mergedMaterials));
+        } else {
+          await pushSyncData(url, key, 'materials', mergedMaterials, userId);
+        }
+
+        // Merge and update clients
+        let localClients = JSON.parse(localStorage.getItem('wireman_clients') || '[]');
+        if (localClients.length === 0) localClients = DEFAULT_DEMO_CLIENTS;
+        let mergedClients = localClients;
+        if (remote.clients) {
+          mergedClients = mergeCollection(localClients, remote.clients.data);
+          setClients(mergedClients);
+          localStorage.setItem('wireman_clients', JSON.stringify(mergedClients));
+        } else {
+          await pushSyncData(url, key, 'clients', mergedClients, userId);
+        }
+
+        // Merge and update invoices
+        let localInvoices = JSON.parse(localStorage.getItem('wireman_invoices') || '[]');
+        let mergedInvoices = localInvoices;
+        if (remote.invoices) {
+          mergedInvoices = mergeCollection(localInvoices, remote.invoices.data);
+          setInvoices(mergedInvoices);
+          localStorage.setItem('wireman_invoices', JSON.stringify(mergedInvoices));
+        } else {
+          await pushSyncData(url, key, 'invoices', mergedInvoices, userId);
+        }
+
+        // Merge and update quotations
+        let localQuotations = JSON.parse(localStorage.getItem('wireman_quotations') || '[]');
+        if (localQuotations.length === 0) localQuotations = [DEMO_QUOTATION];
+        let mergedQuotations = localQuotations;
+        if (remote.quotations) {
+          mergedQuotations = mergeCollection(localQuotations, remote.quotations.data);
+          setQuotations(mergedQuotations);
+          localStorage.setItem('wireman_quotations', JSON.stringify(mergedQuotations));
+        } else {
+          await pushSyncData(url, key, 'quotations', mergedQuotations, userId);
+        }
+
+        // Merge and update estimates
+        let localEstimates = JSON.parse(localStorage.getItem('wireman_estimates') || '[]');
+        let mergedEstimates = localEstimates;
+        if (remote.estimates) {
+          mergedEstimates = mergeCollection(localEstimates, remote.estimates.data);
+          setEstimates(mergedEstimates);
+          localStorage.setItem('wireman_estimates', JSON.stringify(mergedEstimates));
+        } else {
+          await pushSyncData(url, key, 'estimates', mergedEstimates, userId);
+        }
+
+        setSyncStatus('synced');
+      } else {
+        console.error('Failed initial sync:', res.error);
+        setSyncStatus('error');
+      }
+    } catch (err) {
+      console.error('Initial sync exception:', err);
+      setSyncStatus('error');
+    }
+  }
+
+  // Helper to load credentials dynamically
+  const getSupabaseCredentials = () => {
+    const url = supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || '';
+    const key = supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || '';
+    return { url, key };
+  };
+
+  // Auth Operations
+  const handleLogin = async (email, password, customUrl = null, customKey = null) => {
+    if (customUrl && customKey) {
+      setSupabaseUrl(customUrl);
+      setSupabaseKey(customKey);
+      localStorage.setItem('wireman_supabase_url', customUrl);
+      localStorage.setItem('wireman_supabase_key', customKey);
+    }
+    const creds = {
+      url: customUrl || supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || '',
+      key: customKey || supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || ''
+    };
+    if (!creds.url || !creds.key) {
+      setAuthError('Supabase project URL and API key are not configured. Please enter them above.');
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const { signInUser } = await import('./utils/syncService');
+      const res = await signInUser(creds.url, creds.key, email, password);
+      if (res.success) {
+        setCurrentUser(res.user);
+        localStorage.setItem('wireman_supabase_session', JSON.stringify({
+          user: res.user,
+          session: res.session
+        }));
+        setIsAuthOpen(false);
+        triggerInitialSync(creds.url, creds.key, res.user.id);
+      } else {
+        setAuthError(res.error || 'Failed to sign in. Please verify your credentials.');
+      }
+    } catch (err) {
+      setAuthError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignUp = async (email, password, customUrl = null, customKey = null) => {
+    if (customUrl && customKey) {
+      setSupabaseUrl(customUrl);
+      setSupabaseKey(customKey);
+      localStorage.setItem('wireman_supabase_url', customUrl);
+      localStorage.setItem('wireman_supabase_key', customKey);
+    }
+    const creds = {
+      url: customUrl || supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || '',
+      key: customKey || supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || ''
+    };
+    if (!creds.url || !creds.key) {
+      setAuthError('Supabase project URL and API key are not configured. Please enter them above.');
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const { signUpUser } = await import('./utils/syncService');
+      const res = await signUpUser(creds.url, creds.key, email, password);
+      if (res.success) {
+        setCurrentUser(res.user);
+        localStorage.setItem('wireman_supabase_session', JSON.stringify({
+          user: res.user,
+          session: res.session
+        }));
+        setIsAuthOpen(false);
+        triggerInitialSync(creds.url, creds.key, res.user.id);
+      } else {
+        setAuthError(res.error || 'Failed to register.');
+      }
+    } catch (err) {
+      setAuthError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    const creds = getSupabaseCredentials();
+    const sessionStr = localStorage.getItem('wireman_supabase_session');
+    if (sessionStr && creds.url && creds.key) {
+      try {
+        const parsed = JSON.parse(sessionStr);
+        const token = parsed.session?.access_token;
+        if (token) {
+          const { signOutUser } = await import('./utils/syncService');
+          await signOutUser(creds.url, creds.key, token);
+        }
+      } catch (err) {
+        console.error('Sign out error:', err);
+      }
+    }
+    setCurrentUser(null);
+    localStorage.removeItem('wireman_supabase_session');
+    setSyncStatus('offline');
+  };
+
   // Load Initial Data from localStorage
   useEffect(() => {
     const savedProfile = localStorage.getItem('wireman_company_profile');
@@ -110,6 +347,32 @@ export default function App() {
     if (savedEstimates) setEstimates(JSON.parse(savedEstimates));
     if (savedPrintHistory) setPrintHistory(JSON.parse(savedPrintHistory));
     if (savedDefaultTerms) setDefaultTerms(JSON.parse(savedDefaultTerms));
+
+    const savedUrl = localStorage.getItem('wireman_supabase_url');
+    const savedKey = localStorage.getItem('wireman_supabase_key');
+    if (savedUrl) setSupabaseUrl(savedUrl);
+    if (savedKey) setSupabaseKey(savedKey);
+    
+    // Load and verify auth session
+    const savedSession = localStorage.getItem('wireman_supabase_session');
+    let activeUserId = null;
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        if (parsed.user) {
+          setCurrentUser(parsed.user);
+          activeUserId = parsed.user.id;
+        }
+      } catch (err) {
+        console.error('Failed to parse saved session:', err);
+      }
+    }
+
+    const url = savedUrl || import.meta.env?.VITE_SUPABASE_URL;
+    const key = savedKey || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY;
+    if (url && key) {
+      triggerInitialSync(url, key, activeUserId);
+    }
   }, []);
 
   // Synchronize browser page title dynamically for correct PDF filenames
@@ -129,6 +392,19 @@ export default function App() {
   const saveToStorage = (key, data, setter) => {
     setter(data);
     localStorage.setItem(key, JSON.stringify(data));
+
+    // Map localStorage key to Supabase key
+    let cloudKey = null;
+    if (key === 'wireman_company_profile') cloudKey = 'companyProfile';
+    if (key === 'wireman_materials') cloudKey = 'materials';
+    if (key === 'wireman_clients') cloudKey = 'clients';
+    if (key === 'wireman_invoices') cloudKey = 'invoices';
+    if (key === 'wireman_quotations') cloudKey = 'quotations';
+    if (key === 'wireman_estimates') cloudKey = 'estimates';
+    
+    if (cloudKey) {
+      syncToCloud(cloudKey, data);
+    }
   };
 
   // Document Operations
@@ -405,6 +681,14 @@ export default function App() {
             onImportData={handleImportData}
             defaultTerms={defaultTerms}
             onSaveDefaultTerms={(terms) => saveToStorage('wireman_default_terms', terms, setDefaultTerms)}
+            supabaseUrl={supabaseUrl}
+            supabaseKey={supabaseKey}
+            onSaveSyncCredentials={handleSaveSyncCredentials}
+            syncStatus={syncStatus}
+            currentUser={currentUser}
+            onOpenAuth={() => { setIsAuthOpen(true); setAuthError(''); }}
+            onSignOut={handleSignOut}
+            onTriggerSync={() => { const creds = getSupabaseCredentials(); triggerInitialSync(creds.url, creds.key, currentUser?.id); }}
           />
         );
       default:
@@ -478,12 +762,28 @@ export default function App() {
   }
 
   return (
-    <Layout 
-      currentTab={currentTab} 
-      setCurrentTab={setCurrentTab}
-      companyName={companyProfile.name}
-    >
-      {renderTabContent()}
-    </Layout>
+    <>
+      <Layout 
+        currentTab={currentTab} 
+        setCurrentTab={setCurrentTab}
+        companyName={companyProfile.name}
+        syncStatus={syncStatus}
+        currentUser={currentUser}
+        onOpenAuth={() => { setIsAuthOpen(true); setAuthError(''); }}
+        onSignOut={handleSignOut}
+      >
+        {renderTabContent()}
+      </Layout>
+      <Auth 
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onLogin={handleLogin}
+        onSignUp={handleSignUp}
+        error={authError}
+        loading={authLoading}
+        supabaseUrl={supabaseUrl}
+        supabaseKey={supabaseKey}
+      />
+    </>
   );
 }

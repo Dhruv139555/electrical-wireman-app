@@ -12,6 +12,89 @@ import {
   Trash2 
 } from 'lucide-react';
 
+// Reusable animated SVG Donut Chart component
+function SVGDonutChart({ data, totalLabel, totalValue }) {
+  const radius = 35;
+  const strokeWidth = 8;
+  const circumference = 2 * Math.PI * radius; // ~219.91
+  
+  const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
+  let accumulatedPercent = 0;
+  
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+      <div style={{ position: 'relative', width: '130px', height: '130px' }}>
+        <svg viewBox="0 0 100 100" width="100%" height="100%">
+          {/* Background circle */}
+          <circle cx="50" cy="50" r={radius} fill="transparent" stroke="var(--border-color)" strokeWidth={strokeWidth} style={{ opacity: 0.2 }} />
+          
+          {data.map((item, idx) => {
+            if (item.value === 0) return null;
+            const pct = (item.value / total);
+            const dashArray = `${pct * circumference} ${circumference}`;
+            const dashOffset = circumference - (accumulatedPercent * circumference) + (circumference / 4); // Start at top
+            
+            accumulatedPercent += pct;
+            
+            return (
+              <circle
+                key={idx}
+                cx="50"
+                cy="50"
+                r={radius}
+                fill="transparent"
+                stroke={item.color}
+                strokeWidth={strokeWidth}
+                strokeDasharray={dashArray}
+                strokeDashoffset={dashOffset}
+                strokeLinecap="round"
+                style={{ 
+                  transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)', 
+                  transform: 'rotate(-90deg)', 
+                  transformOrigin: '50% 50%' 
+                }}
+              >
+                <title>{`${item.name}: ${pct * 100}%`}</title>
+              </circle>
+            );
+          })}
+        </svg>
+        {/* Inner Label */}
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center',
+          pointerEvents: 'none',
+          width: '80%'
+        }}>
+          <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>{totalLabel}</div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 800, marginTop: '2px', color: 'var(--text-color)' }}>₹{totalValue}</div>
+        </div>
+      </div>
+      
+      {/* Legend */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', padding: '0 10px' }}>
+        {data.map((item, idx) => {
+          const pctVal = total > 1 ? ((item.value / total) * 100).toFixed(0) : 0;
+          return (
+            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', alignItems: 'center' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ width: '8px', height: '8px', backgroundColor: item.color, borderRadius: '50%' }}></span>
+                <span style={{ color: 'var(--text-muted)' }}>{item.name}</span>
+              </span>
+              <span style={{ fontWeight: 700, color: 'var(--text-color)' }}>
+                {pctVal}% (₹{item.value >= 100000 ? `${(item.value / 100000).toFixed(1)}L` : item.value >= 1000 ? `${(item.value / 1000).toFixed(0)}k` : item.value})
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard({ 
   invoices = [], 
   quotations = [], 
@@ -27,6 +110,10 @@ export default function Dashboard({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, invoice, quotation
   const [analyticsTab, setAnalyticsTab] = useState('monthly');
+
+  // Chart interactivity states
+  const [activeLegend, setActiveLegend] = useState({ paid: true, pending: true, approvedQuotes: true });
+  const [hoveredMonth, setHoveredMonth] = useState(null);
 
   // Calculate stats
   const totalInvoiced = invoices.reduce((sum, item) => sum + (item.grandTotal || 0), 0);
@@ -289,7 +376,7 @@ export default function Dashboard({
 
         {/* Tab 1: Monthly */}
         {analyticsTab === 'monthly' && (
-          <div>
+          <div style={{ position: 'relative' }}>
             {monthsForChart.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                 No transaction data available yet to display monthly trend.
@@ -297,17 +384,69 @@ export default function Dashboard({
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 {/* SVG Chart */}
-                <div style={{ padding: '10px', backgroundColor: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', minWidth: '280px' }}>
+                <div style={{ padding: '10px', backgroundColor: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', minWidth: '280px', position: 'relative' }}>
+                  
+                  {/* Floating Tooltip */}
+                  {hoveredMonth && (
+                    <div style={{
+                      position: 'absolute',
+                      left: `${hoveredMonth.x}px`,
+                      top: `${hoveredMonth.y}px`,
+                      transform: 'translate(-50%, -100%)',
+                      backgroundColor: '#1e293b',
+                      color: '#ffffff',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3)',
+                      pointerEvents: 'none',
+                      zIndex: 100,
+                      border: '1px solid #334155',
+                      minWidth: '140px',
+                      transition: 'left 0.15s ease, top 0.15s ease'
+                    }}>
+                      <div style={{ fontWeight: 700, borderBottom: '1px solid #475569', paddingBottom: '4px', marginBottom: '6px', textAlign: 'center' }}>
+                        {formatMonthLabel(hoveredMonth.key)}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ color: '#94a3b8' }}>Paid:</span>
+                          <span style={{ color: '#34d399', fontWeight: 700 }}>₹{hoveredMonth.data.paid.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ color: '#94a3b8' }}>Quotes:</span>
+                          <span style={{ color: '#60a5fa', fontWeight: 700 }}>₹{hoveredMonth.data.approvedQuotes.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ color: '#94a3b8' }}>Pending:</span>
+                          <span style={{ color: '#fbbf24', fontWeight: 700 }}>₹{hoveredMonth.data.pending.toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '10px', fontSize: '0.75rem', fontWeight: 600, flexWrap: 'wrap' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span 
+                      onClick={() => setActiveLegend(p => ({ ...p, paid: !p.paid }))}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', opacity: activeLegend.paid ? 1 : 0.35, transition: 'opacity 0.2s' }}
+                      title="Click to toggle Paid"
+                    >
                       <span style={{ width: '12px', height: '12px', backgroundColor: 'var(--success)', borderRadius: '2px' }}></span>
                       Paid (Revenue)
                     </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span 
+                      onClick={() => setActiveLegend(p => ({ ...p, approvedQuotes: !p.approvedQuotes }))}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', opacity: activeLegend.approvedQuotes ? 1 : 0.35, transition: 'opacity 0.2s' }}
+                      title="Click to toggle Approved Quotes"
+                    >
                       <span style={{ width: '12px', height: '12px', backgroundColor: 'var(--primary)', borderRadius: '2px' }}></span>
                       Approved Quotes (Work Done)
                     </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span 
+                      onClick={() => setActiveLegend(p => ({ ...p, pending: !p.pending }))}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', opacity: activeLegend.pending ? 1 : 0.35, transition: 'opacity 0.2s' }}
+                      title="Click to toggle Pending"
+                    >
                       <span style={{ width: '12px', height: '12px', backgroundColor: 'var(--accent)', borderRadius: '2px' }}></span>
                       Pending Invoices
                     </span>
@@ -319,7 +458,10 @@ export default function Dashboard({
                       const yVal = 180 - pct * 150;
                       const displayVal = Math.round(monthsForChart.reduce((max, key) => {
                         const m = monthlyData[key];
-                        return Math.max(max, m.paid, m.pending, m.approvedQuotes);
+                        const valPaid = activeLegend.paid ? m.paid : 0;
+                        const valPending = activeLegend.pending ? m.pending : 0;
+                        const valApproved = activeLegend.approvedQuotes ? m.approvedQuotes : 0;
+                        return Math.max(max, valPaid, valPending, valApproved);
                       }, 0) || 1000) * pct;
 
                       return (
@@ -338,16 +480,19 @@ export default function Dashboard({
                       const maxVal = Math.max(
                         monthsForChart.reduce((max, k) => {
                           const mData = monthlyData[k];
-                          return Math.max(max, mData.paid, mData.pending, mData.approvedQuotes);
+                          const valPaid = activeLegend.paid ? mData.paid : 0;
+                          const valPending = activeLegend.pending ? mData.pending : 0;
+                          const valApproved = activeLegend.approvedQuotes ? mData.approvedQuotes : 0;
+                          return Math.max(max, valPaid, valPending, valApproved);
                         }, 0) || 1000
                       );
 
                       const colWidth = 480 / monthsForChart.length;
                       const xCenter = 70 + idx * colWidth + colWidth / 2;
 
-                      const hPaid = (m.paid / maxVal) * 150;
-                      const hApproved = (m.approvedQuotes / maxVal) * 150;
-                      const hPending = (m.pending / maxVal) * 150;
+                      const hPaid = activeLegend.paid ? (m.paid / maxVal) * 150 : 0;
+                      const hApproved = activeLegend.approvedQuotes ? (m.approvedQuotes / maxVal) * 150 : 0;
+                      const hPending = activeLegend.pending ? (m.pending / maxVal) * 150 : 0;
 
                       const yPaid = 180 - hPaid;
                       const yApproved = 180 - hApproved;
@@ -355,47 +500,70 @@ export default function Dashboard({
 
                       return (
                         <g key={key}>
-                          {/* Paid Bar (Green) */}
+                          {/* Hover Overlay Rect covering entire column */}
                           <rect 
-                            x={xCenter - 21} 
-                            y={yPaid} 
-                            width="12" 
-                            height={hPaid} 
-                            fill="var(--success)" 
-                            rx="2" 
-                            style={{ transition: 'all 0.3s ease' }}
-                          >
-                            <title>{`Paid: ₹${m.paid.toLocaleString('en-IN')}`}</title>
-                          </rect>
+                            x={70 + idx * colWidth} 
+                            y="20" 
+                            width={colWidth} 
+                            height="160" 
+                            fill="transparent"
+                            style={{ cursor: 'pointer' }}
+                            onMouseMove={(e) => {
+                              const rect = e.currentTarget.ownerSVGElement.getBoundingClientRect();
+                              // Calculate relative mouse position inside the SVG container
+                              const mouseX = e.clientX - rect.left;
+                              const mouseY = e.clientY - rect.top;
+                              setHoveredMonth({
+                                key,
+                                data: m,
+                                x: mouseX,
+                                y: mouseY - 15
+                              });
+                            }}
+                            onMouseLeave={() => setHoveredMonth(null)}
+                          />
+
+                          {/* Paid Bar (Green) */}
+                          {activeLegend.paid && hPaid > 0 && (
+                            <rect 
+                              x={xCenter - 21} 
+                              y={yPaid} 
+                              width="12" 
+                              height={hPaid} 
+                              fill="var(--success)" 
+                              rx="2" 
+                              style={{ transition: 'all 0.3s ease', pointerEvents: 'none' }}
+                            />
+                          )}
 
                           {/* Approved Quotes Bar (Blue) */}
-                          <rect 
-                            x={xCenter - 6} 
-                            y={yApproved} 
-                            width="12" 
-                            height={hApproved} 
-                            fill="var(--primary)" 
-                            rx="2"
-                            style={{ transition: 'all 0.3s ease' }}
-                          >
-                            <title>{`Approved Quotes: ₹${m.approvedQuotes.toLocaleString('en-IN')}`}</title>
-                          </rect>
+                          {activeLegend.approvedQuotes && hApproved > 0 && (
+                            <rect 
+                              x={xCenter - 6} 
+                              y={yApproved} 
+                              width="12" 
+                              height={hApproved} 
+                              fill="var(--primary)" 
+                              rx="2"
+                              style={{ transition: 'all 0.3s ease', pointerEvents: 'none' }}
+                            />
+                          )}
 
                           {/* Pending Bar (Amber) */}
-                          <rect 
-                            x={xCenter + 9} 
-                            y={yPending} 
-                            width="12" 
-                            height={hPending} 
-                            fill="var(--accent)" 
-                            rx="2"
-                            style={{ transition: 'all 0.3s ease' }}
-                          >
-                            <title>{`Pending Invoices: ₹${m.pending.toLocaleString('en-IN')}`}</title>
-                          </rect>
+                          {activeLegend.pending && hPending > 0 && (
+                            <rect 
+                              x={xCenter + 9} 
+                              y={yPending} 
+                              width="12" 
+                              height={hPending} 
+                              fill="var(--accent)" 
+                              rx="2"
+                              style={{ transition: 'all 0.3s ease', pointerEvents: 'none' }}
+                            />
+                          )}
 
                           {/* Month Label */}
-                          <text x={xCenter} y="200" textAnchor="middle" fontSize="10" fontWeight="600" fill="var(--text-muted)">
+                          <text x={xCenter} y="200" textAnchor="middle" fontSize="10" fontWeight="600" fill="var(--text-muted)" style={{ pointerEvents: 'none' }}>
                             {formatMonthLabel(key)}
                           </text>
                         </g>
@@ -474,74 +642,115 @@ export default function Dashboard({
 
         {/* Tab 3: Pipeline & Status */}
         {analyticsTab === 'pipeline' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', flexWrap: 'wrap' }}>
-            {/* Quotations Pipeline */}
-            <div style={{ borderRight: '1px solid var(--border-color)', paddingRight: '1.5rem' }}>
-              <h4 style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--primary)', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Quotation Pipeline</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Total: ₹{quotations.reduce((sum, q) => sum + (q.grandTotal || 0), 0).toLocaleString('en-IN')}
-                </span>
-              </h4>
-              {Object.entries(pipelineStats.quotes).map(([status, stat]) => {
-                const totalQuotesVal = quotations.reduce((sum, q) => sum + (q.grandTotal || 0), 0) || 1;
-                const pct = (stat.total / totalQuotesVal) * 100;
-                
-                let barColor = 'var(--text-muted)';
-                if (status === 'Approved') barColor = 'var(--success)';
-                if (status === 'Sent') barColor = 'var(--primary)';
-                if (status === 'Draft') barColor = 'var(--accent)';
-                if (status === 'Declined') barColor = 'var(--danger)';
+          <div>
+            {/* Donut Visual Charts */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
+              {/* Donut 1: Quotations */}
+              <div className="card" style={{ padding: '1.25rem', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)' }}>
+                <h4 style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '1.25rem', color: 'var(--primary)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Quotation Status Share
+                </h4>
+                <SVGDonutChart 
+                  data={[
+                    { name: 'Approved', value: pipelineStats.quotes.Approved?.total || 0, color: 'var(--success)' },
+                    { name: 'Sent', value: pipelineStats.quotes.Sent?.total || 0, color: 'var(--primary)' },
+                    { name: 'Draft', value: pipelineStats.quotes.Draft?.total || 0, color: 'var(--accent)' },
+                    { name: 'Declined', value: pipelineStats.quotes.Declined?.total || 0, color: 'var(--danger)' }
+                  ]}
+                  totalLabel="Total Quotes"
+                  totalValue={quotations.reduce((sum, q) => sum + (q.grandTotal || 0), 0).toLocaleString('en-IN')}
+                />
+              </div>
 
-                return (
-                  <div key={status} style={{ marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 600 }}>
-                        {status} <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}>({stat.count})</span>
-                      </span>
-                      <span style={{ fontWeight: 700 }}>₹{stat.total.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div style={{ height: '6px', backgroundColor: 'var(--bg-app)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, height: '100%', backgroundColor: barColor, borderRadius: '3px' }}></div>
-                    </div>
-                  </div>
-                );
-              })}
+              {/* Donut 2: Invoices */}
+              <div className="card" style={{ padding: '1.25rem', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)' }}>
+                <h4 style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '1.25rem', color: 'var(--primary)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Invoice Status Share
+                </h4>
+                <SVGDonutChart 
+                  data={[
+                    { name: 'Paid', value: pipelineStats.invoices.Paid?.total || 0, color: 'var(--success)' },
+                    { name: 'Partially Paid', value: pipelineStats.invoices['Partially Paid']?.total || 0, color: 'var(--warning)' },
+                    { name: 'Sent', value: pipelineStats.invoices.Sent?.total || 0, color: 'var(--primary)' },
+                    { name: 'Draft', value: pipelineStats.invoices.Draft?.total || 0, color: 'var(--accent)' },
+                    { name: 'Cancelled', value: pipelineStats.invoices.Cancelled?.total || 0, color: 'var(--danger)' }
+                  ]}
+                  totalLabel="Total Invoiced"
+                  totalValue={invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0).toLocaleString('en-IN')}
+                />
+              </div>
             </div>
 
-            {/* Invoices Pipeline */}
-            <div>
-              <h4 style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--primary)', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Invoice Pipeline</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Total: ₹{invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0).toLocaleString('en-IN')}
-                </span>
-              </h4>
-              {Object.entries(pipelineStats.invoices).map(([status, stat]) => {
-                const totalInvoicesVal = invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0) || 1;
-                const pct = (stat.total / totalInvoicesVal) * 100;
-                
-                let barColor = 'var(--text-muted)';
-                if (status === 'Paid') barColor = 'var(--success)';
-                if (status === 'Partially Paid') barColor = 'var(--warning)';
-                if (status === 'Sent') barColor = 'var(--primary)';
-                if (status === 'Draft') barColor = 'var(--accent)';
-                if (status === 'Cancelled') barColor = 'var(--danger)';
+            {/* Standard horizontal breakdown details */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', flexWrap: 'wrap' }}>
+              {/* Quotations Pipeline */}
+              <div style={{ borderRight: '1px solid var(--border-color)', paddingRight: '1.5rem' }}>
+                <h4 style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--primary)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Quotation Pipeline</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Total: ₹{quotations.reduce((sum, q) => sum + (q.grandTotal || 0), 0).toLocaleString('en-IN')}
+                  </span>
+                </h4>
+                {Object.entries(pipelineStats.quotes).map(([status, stat]) => {
+                  const totalQuotesVal = quotations.reduce((sum, q) => sum + (q.grandTotal || 0), 0) || 1;
+                  const pct = (stat.total / totalQuotesVal) * 100;
+                  
+                  let barColor = 'var(--text-muted)';
+                  if (status === 'Approved') barColor = 'var(--success)';
+                  if (status === 'Sent') barColor = 'var(--primary)';
+                  if (status === 'Draft') barColor = 'var(--accent)';
+                  if (status === 'Declined') barColor = 'var(--danger)';
 
-                return (
-                  <div key={status} style={{ marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 600 }}>
-                        {status} <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}>({stat.count})</span>
-                      </span>
-                      <span style={{ fontWeight: 700 }}>₹{stat.total.toLocaleString('en-IN')}</span>
+                  return (
+                    <div key={status} style={{ marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: 600 }}>
+                          {status} <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}>({stat.count})</span>
+                        </span>
+                        <span style={{ fontWeight: 700 }}>₹{stat.total.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div style={{ height: '6px', backgroundColor: 'var(--bg-app)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', backgroundColor: barColor, borderRadius: '3px' }}></div>
+                      </div>
                     </div>
-                    <div style={{ height: '6px', backgroundColor: 'var(--bg-app)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, height: '100%', backgroundColor: barColor, borderRadius: '3px' }}></div>
+                  );
+                })}
+              </div>
+
+              {/* Invoices Pipeline */}
+              <div>
+                <h4 style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--primary)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Invoice Pipeline</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Total: ₹{invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0).toLocaleString('en-IN')}
+                  </span>
+                </h4>
+                {Object.entries(pipelineStats.invoices).map(([status, stat]) => {
+                  const totalInvoicesVal = invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0) || 1;
+                  const pct = (stat.total / totalInvoicesVal) * 100;
+                  
+                  let barColor = 'var(--text-muted)';
+                  if (status === 'Paid') barColor = 'var(--success)';
+                  if (status === 'Partially Paid') barColor = 'var(--warning)';
+                  if (status === 'Sent') barColor = 'var(--primary)';
+                  if (status === 'Draft') barColor = 'var(--accent)';
+                  if (status === 'Cancelled') barColor = 'var(--danger)';
+
+                  return (
+                    <div key={status} style={{ marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: 600 }}>
+                          {status} <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}>({stat.count})</span>
+                        </span>
+                        <span style={{ fontWeight: 700 }}>₹{stat.total.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div style={{ height: '6px', backgroundColor: 'var(--bg-app)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', backgroundColor: barColor, borderRadius: '3px' }}></div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

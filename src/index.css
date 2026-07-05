@@ -829,7 +829,7 @@ button, input, select, textarea {
   font-size: 9.5px;
 }
 
-/* Print Overrides */
+/* Print Overrides & PDF Mode */
 @media print {
   @page {
     margin: 0;
@@ -841,7 +841,9 @@ button, input, select, textarea {
     margin: 0;
     padding: 0;
   }
-  
+}
+
+@media print {
   .no-print {
     display: none !important;
   }
@@ -851,19 +853,280 @@ button, input, select, textarea {
   }
   
   .hansa-invoice-sheet {
-    border: none;
-    padding: 12mm 15mm;
-    margin: 0;
-    max-width: 100%;
-    width: 100%;
-    box-sizing: border-box;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 12mm 15mm !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    color: #000000 !important;
   }
 
-  .hansa-header,
-  .hansa-meta-grid,
-  .hansa-billing-parties,
-  .hansa-table,
-  .hansa-bottom-grid {
-    border-width: 1px !important;
+  /* Reset all text shadows and make text solid black for crisp printing */
+  .hansa-invoice-sheet,
+  .hansa-invoice-sheet * {
+    text-shadow: none !important;
+    box-shadow: none !important;
+    border-color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
+
+  .hansa-header {
+    border-bottom: 2px solid #000000 !important;
+    margin-bottom: 12px !important;
+  }
+  
+  .hansa-meta-grid {
+    border: 2px solid #000000 !important;
+    background-color: #f5f5f5 !important;
+    margin-bottom: 12px !important;
+  }
+
+  .hansa-billing-parties {
+    border: 2px solid #000000 !important;
+    margin-bottom: 12px !important;
+  }
+
+  .hansa-party-box:first-child {
+    border-right: 2px solid #000000 !important;
+  }
+
+  .hansa-party-box h3 {
+    border: 1px solid #000000 !important;
+    background-color: #e5e5e5 !important;
+    color: #000000 !important;
+  }
+
+  .hansa-state-badge {
+    border: 1px solid #000000 !important;
+    color: #000000 !important;
+    background-color: #f0f0f0 !important;
+  }
+
+  .hansa-table {
+    border: 2px solid #000000 !important;
+    border-collapse: collapse !important;
+    margin-bottom: 12px !important;
+  }
+
+  .hansa-table th {
+    border-bottom: 2px solid #000000 !important;
+    border-right: 1px solid #000000 !important;
+    background-color: #e5e5e5 !important;
+    color: #000000 !important;
+  }
+
+  .hansa-table th:last-child {
+    border-right: none !important;
+  }
+
+  .hansa-table td {
+    border-bottom: 1px solid #000000 !important;
+    border-right: 1px solid #000000 !important;
+    color: #000000 !important;
+  }
+
+  .hansa-table td:last-child {
+    border-right: none !important;
+  }
+
+  .hansa-table tr.total-row td {
+    border-top: 2px solid #000000 !important;
+    border-bottom: 2px solid #000000 !important;
+    background-color: #f5f5f5 !important;
+    color: #000000 !important;
+  }
+
+  .hansa-bottom-grid {
+    border: 2px solid #000000 !important;
+  }
+
+  .hansa-bottom-left {
+    border-right: 2px solid #000000 !important;
+  }
+
+  .hansa-words-box {
+    border-bottom: 1px solid #000000 !important;
+  }
+
+  .hansa-tax-box {
+    border-bottom: 1px solid #000000 !important;
+  }
+
+  .hansa-tax-row {
+    border-bottom: 1px dashed #000000 !important;
+  }
+
+  .hansa-tax-row.grand-total-row {
+    background-color: #e5e5e5 !important;
+    border-top: 2px solid #000000 !important;
+    border-bottom: 2px solid #000000 !important;
+    color: #000000 !important;
+  }
+
+  .hansa-sign-line {
+    border-top: 1.5px solid #000000 !important;
+    color: #000000 !important;
+  }
+
+  /* Force solid black text for elements that normally have faint text colors */
+  .hansa-company-info p,
+  .hansa-company-info span,
+  .hansa-company-info,
+  .hansa-company-info h1,
+  .hansa-doc-title,
+  .hansa-words-label,
+  .hansa-words-value,
+  .hansa-tax-row span,
+  .hansa-tax-row strong,
+  .hansa-terms h4,
+  .hansa-terms li,
+  .hansa-sign-section p,
+  .hansa-sign-section strong,
+  .hansa-party-details,
+  .hansa-party-details .name,
+  .hansa-party-details p {
+    color: #000000 !important;
+  }
+}
+
+/* PDF Mode overrides - replicates print styles when class is applied */
+.hansa-invoice-sheet.pdf-mode {
+  border: none !important;
+  box-shadow: none !important;
+  padding: 12mm 15mm !important;
+  margin: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode * {
+  text-shadow: none !important;
+  box-shadow: none !important;
+  border-color: #000000 !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-header {
+  border-bottom: 2px solid #000000 !important;
+  margin-bottom: 12px !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-meta-grid {
+  border: 2px solid #000000 !important;
+  background-color: #f5f5f5 !important;
+  margin-bottom: 12px !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-billing-parties {
+  border: 2px solid #000000 !important;
+  margin-bottom: 12px !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-party-box:first-child {
+  border-right: 2px solid #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-party-box h3 {
+  border: 1px solid #000000 !important;
+  background-color: #e5e5e5 !important;
+  color: #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-state-badge {
+  border: 1px solid #000000 !important;
+  color: #000000 !important;
+  background-color: #f0f0f0 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-table {
+  border: 2px solid #000000 !important;
+  border-collapse: collapse !important;
+  margin-bottom: 12px !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-table th {
+  border-bottom: 2px solid #000000 !important;
+  border-right: 1px solid #000000 !important;
+  background-color: #e5e5e5 !important;
+  color: #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-table th:last-child {
+  border-right: none !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-table td {
+  border-bottom: 1px solid #000000 !important;
+  border-right: 1px solid #000000 !important;
+  color: #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-table td:last-child {
+  border-right: none !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-table tr.total-row td {
+  border-top: 2px solid #000000 !important;
+  border-bottom: 2px solid #000000 !important;
+  background-color: #f5f5f5 !important;
+  color: #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-bottom-grid {
+  border: 2px solid #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-bottom-left {
+  border-right: 2px solid #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-words-box {
+  border-bottom: 1px solid #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-tax-box {
+  border-bottom: 1px solid #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-tax-row {
+  border-bottom: 1px dashed #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-tax-row.grand-total-row {
+  background-color: #e5e5e5 !important;
+  border-top: 2px solid #000000 !important;
+  border-bottom: 2px solid #000000 !important;
+  color: #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-sign-line {
+  border-top: 1.5px solid #000000 !important;
+  color: #000000 !important;
+}
+
+.hansa-invoice-sheet.pdf-mode .hansa-company-info p,
+.hansa-invoice-sheet.pdf-mode .hansa-company-info span,
+.hansa-invoice-sheet.pdf-mode .hansa-company-info,
+.hansa-invoice-sheet.pdf-mode .hansa-company-info h1,
+.hansa-invoice-sheet.pdf-mode .hansa-doc-title,
+.hansa-invoice-sheet.pdf-mode .hansa-words-label,
+.hansa-invoice-sheet.pdf-mode .hansa-words-value,
+.hansa-invoice-sheet.pdf-mode .hansa-tax-row span,
+.hansa-invoice-sheet.pdf-mode .hansa-tax-row strong,
+.hansa-invoice-sheet.pdf-mode .hansa-terms h4,
+.hansa-invoice-sheet.pdf-mode .hansa-terms li,
+.hansa-invoice-sheet.pdf-mode .hansa-sign-section p,
+.hansa-invoice-sheet.pdf-mode .hansa-sign-section strong,
+.hansa-invoice-sheet.pdf-mode .hansa-party-details,
+.hansa-invoice-sheet.pdf-mode .hansa-party-details .name,
+.hansa-invoice-sheet.pdf-mode .hansa-party-details p {
+  color: #000000 !important;
 }

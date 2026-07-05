@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { formatDate } from '../utils/helper';
 import { LOGO_BASE64 } from '../utils/logoBase64';
 
 export default function InvoicePrint({ document, companyProfile, onPrint }) {
   if (!document) return null;
 
+  const [isDownloading, setIsDownloading] = useState(false);
   const isInvoice = document.docType === 'Invoice';
   const { clientInfo = {}, items = [], terms = [] } = document;
   const profile = companyProfile || {};
@@ -25,6 +26,63 @@ export default function InvoicePrint({ document, companyProfile, onPrint }) {
     window.print();
   };
 
+  const handleDownloadPDF = () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+
+    const loadHtml2Pdf = () => {
+      if (window.html2pdf) {
+        return Promise.resolve(window.html2pdf);
+      }
+      return new Promise((resolve, reject) => {
+        const script = window.document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        script.integrity = 'sha512-GsLlZN/3F2ErC5IfS51RC20FMHrJRVsHxxsrtUDURm/R5zEMx1XRFCc1385LcyYVtxP5PPxoZeYGZO360gURuqA==';
+        script.crossOrigin = 'anonymous';
+        script.onload = () => resolve(window.html2pdf);
+        script.onerror = (err) => reject(err);
+        window.document.body.appendChild(script);
+      });
+    };
+
+    loadHtml2Pdf()
+      .then((html2pdf) => {
+        const element = window.document.querySelector('.hansa-invoice-sheet');
+        if (!element) {
+          setIsDownloading(false);
+          return;
+        }
+
+        // Add class to apply sharp print styling
+        element.classList.add('pdf-mode');
+
+        const clientName = (document.clientInfo?.name || 'client').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+        const docLabel = document.docType.toLowerCase();
+        const filename = `hansa_${clientName}_${docLabel}_${document.docNumber}.pdf`;
+
+        const opt = {
+          margin:       8,
+          filename:     filename,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2.5, useCORS: true, letterRendering: true },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        return html2pdf().set(opt).from(element).save().then(() => {
+          element.classList.remove('pdf-mode');
+          setIsDownloading(false);
+          if (onPrint) {
+            onPrint(document);
+          }
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to generate PDF:', err);
+        alert('Could not download PDF. Please try the standard Print option instead.');
+        setIsDownloading(false);
+      });
+  };
+
   return (
     <div className="hansa-invoice-wrapper">
       {/* Action panel shown on screen only */}
@@ -42,7 +100,15 @@ export default function InvoicePrint({ document, companyProfile, onPrint }) {
           <span style={{ fontWeight: 600 }}>Document Preview:</span> #{document.docNumber} ({document.docType})
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={handlePrint} className="btn btn-primary">
+          <button 
+            onClick={handleDownloadPDF} 
+            className="btn btn-accent" 
+            disabled={isDownloading}
+            style={{ fontWeight: 600 }}
+          >
+            {isDownloading ? 'Generating PDF...' : 'Download PDF'}
+          </button>
+          <button onClick={handlePrint} className="btn btn-primary" style={{ fontWeight: 600 }}>
             Print / Save PDF
           </button>
         </div>

@@ -175,6 +175,12 @@ export default function InvoiceForm({
   // Items table operations
   const handleItemChange = (index, field, value) => {
     const newItems = [...items];
+    if (field === 'showDropdown' && value === true) {
+      // Close all other dropdowns
+      newItems.forEach((it, idx) => {
+        if (idx !== index) it.showDropdown = false;
+      });
+    }
     newItems[index][field] = value;
     setItems(newItems);
   };
@@ -613,24 +619,31 @@ export default function InvoiceForm({
                           handleItemChange(index, 'showDropdown', true);
                         }}
                         onFocus={() => handleItemChange(index, 'showDropdown', true)}
+                        onBlur={() => setTimeout(() => handleItemChange(index, 'showDropdown', false), 250)}
                         className="form-control"
                         placeholder="Type to search or write custom item..."
                       />
 
-                      {item.showDropdown && item.name && (
-                        <div className="autocomplete-dropdown">
-                          {filteredProds.slice(0, 10).map(p => (
+                      {item.showDropdown && (
+                        <div className="autocomplete-dropdown" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                          {filteredProds.slice(0, 50).map(p => (
                             <div 
                               key={p.id} 
-                              onClick={() => handleSelectProduct(index, p)}
+                              onMouseDown={() => handleSelectProduct(index, p)}
                               className="autocomplete-item"
+                              style={{ cursor: 'pointer' }}
                             >
                               {p.name} - <span style={{ color: '#888', fontSize: '0.75rem' }}>₹{p.rate} / {p.unit}</span>
                             </div>
                           ))}
+                          {filteredProds.length === 0 && (
+                            <div style={{ padding: '8px', fontSize: '0.8rem', color: '#999', textAlign: 'center' }}>
+                              No matching products
+                            </div>
+                          )}
                           <div 
-                            onClick={() => handleItemChange(index, 'showDropdown', false)}
-                            style={{ padding: '4px 6px', borderTop: '1px solid #eee', fontSize: '0.75rem', color: 'var(--primary)', textAlign: 'right', cursor: 'pointer' }}
+                            onMouseDown={() => handleItemChange(index, 'showDropdown', false)}
+                            style={{ padding: '4px 6px', borderTop: '1px solid #eee', fontSize: '0.75rem', color: 'var(--primary)', textAlign: 'right', cursor: 'pointer', fontWeight: 600 }}
                           >
                             Close
                           </div>
