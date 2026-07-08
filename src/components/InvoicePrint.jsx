@@ -42,7 +42,7 @@ export default function InvoicePrint({ document, companyProfile, onPrint }) {
 
     const clientName = (document.clientInfo?.name || 'client').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     const docLabel = document.docType.toLowerCase();
-    const filename = `hansa_${clientName}_${docLabel}_${document.docNumber}.pdf`;
+    const filename = `${clientName}_${docLabel}_${document.docNumber}.pdf`;
 
     const opt = {
       margin:       8,
