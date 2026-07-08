@@ -7,7 +7,7 @@ import Estimator from './components/Estimator';
 import InventoryList from './components/InventoryList';
 import ClientList from './components/ClientList';
 import SettingsView from './components/Settings';
-import Auth from './components/Auth';
+import DocumentList from './components/DocumentList';
 
 import { 
   DEFAULT_COMPANY_PROFILE, 
@@ -93,15 +93,19 @@ export default function App() {
   const [estimatorPreload, setEstimatorPreload] = useState(null); // preloaded state from estimator convert
 
   // Supabase Sync States
-  const [supabaseUrl, setSupabaseUrl] = useState(import.meta.env?.VITE_SUPABASE_URL || 'https://ivrmxblrjbnswhwjougt.supabase.co');
-  const [supabaseKey, setSupabaseKey] = useState(import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1seyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1s');
+  const [supabaseUrl, setSupabaseUrl] = useState(localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || '');
+  const [supabaseKey, setSupabaseKey] = useState(localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || '');
   const [syncStatus, setSyncStatus] = useState('offline');
 
-  // Auth States
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
+  // Device ID for separating sync data per browser/device
+  const [deviceId] = useState(() => {
+    let id = localStorage.getItem('wireman_device_id');
+    if (!id) {
+      id = 'dev_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+      localStorage.setItem('wireman_device_id', id);
+    }
+    return id;
+  });
 
   // Background Cloud Sync Trigger
   const syncToCloud = async (id, data) => {
@@ -110,8 +114,7 @@ export default function App() {
     setSyncStatus('syncing');
     try {
       const { pushSyncData } = await import('./utils/syncService');
-      const userId = currentUser ? currentUser.id : null;
-      const res = await pushSyncData(creds.url, creds.key, id, data, userId);
+      const res = await pushSyncData(creds.url, creds.key, id, data, deviceId);
       if (res.success) {
         setSyncStatus('synced');
       } else {
@@ -128,7 +131,7 @@ export default function App() {
     setSupabaseKey(key);
     localStorage.setItem('wireman_supabase_url', url);
     localStorage.setItem('wireman_supabase_key', key);
-    triggerInitialSync(url, key, currentUser?.id);
+    triggerInitialSync(url, key, deviceId);
   };
 
   // Initial pull and merge function
@@ -226,125 +229,9 @@ export default function App() {
 
   // Helper to load credentials dynamically
   const getSupabaseCredentials = () => {
-    const url = supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || 'https://ivrmxblrjbnswhwjougt.supabase.co';
-    const key = supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1seyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1s';
+    const url = supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || '';
+    const key = supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || '';
     return { url, key };
-  };
-
-  // Auth Operations
-  const handleLogin = async (email, password, customUrl = null, customKey = null) => {
-    if (customUrl && customKey) {
-      setSupabaseUrl(customUrl);
-      setSupabaseKey(customKey);
-      localStorage.setItem('wireman_supabase_url', customUrl);
-      localStorage.setItem('wireman_supabase_key', customKey);
-    }
-    const creds = {
-      url: customUrl || supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || '',
-      key: customKey || supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || ''
-    };
-    if (!creds.url || !creds.key) {
-      setAuthError('Supabase project URL and API key are not configured. Please enter them above.');
-      return;
-    }
-    setAuthLoading(true);
-    setAuthError('');
-    try {
-      const { signInUser } = await import('./utils/syncService');
-      const res = await signInUser(creds.url, creds.key, email, password);
-      if (res.success) {
-        setCurrentUser(res.user);
-        localStorage.setItem('wireman_supabase_session', JSON.stringify({
-          user: res.user,
-          session: res.session
-        }));
-        setIsAuthOpen(false);
-        triggerInitialSync(creds.url, creds.key, res.user.id);
-      } else {
-        setAuthError(res.error || 'Failed to sign in. Please verify your credentials.');
-      }
-    } catch (err) {
-      setAuthError(err.message || 'An unexpected error occurred.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleSignUp = async (email, password, customUrl = null, customKey = null) => {
-    if (customUrl && customKey) {
-      setSupabaseUrl(customUrl);
-      setSupabaseKey(customKey);
-      localStorage.setItem('wireman_supabase_url', customUrl);
-      localStorage.setItem('wireman_supabase_key', customKey);
-    }
-    const creds = {
-      url: customUrl || supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || '',
-      key: customKey || supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || ''
-    };
-    if (!creds.url || !creds.key) {
-      setAuthError('Supabase project URL and API key are not configured. Please enter them above.');
-      return;
-    }
-    setAuthLoading(true);
-    setAuthError('');
-    try {
-      const { signUpUser } = await import('./utils/syncService');
-      const res = await signUpUser(creds.url, creds.key, email, password);
-      if (res.success) {
-        setCurrentUser(res.user);
-        localStorage.setItem('wireman_supabase_session', JSON.stringify({
-          user: res.user,
-          session: res.session
-        }));
-        setIsAuthOpen(false);
-        triggerInitialSync(creds.url, creds.key, res.user.id);
-      } else {
-        setAuthError(res.error || 'Failed to register.');
-      }
-    } catch (err) {
-      setAuthError(err.message || 'An unexpected error occurred.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleGoogleSignIn = (customUrl = null, customKey = null) => {
-    if (customUrl && customKey) {
-      setSupabaseUrl(customUrl);
-      setSupabaseKey(customKey);
-      localStorage.setItem('wireman_supabase_url', customUrl);
-      localStorage.setItem('wireman_supabase_key', customKey);
-    }
-    const creds = {
-      url: customUrl || supabaseUrl || localStorage.getItem('wireman_supabase_url') || import.meta.env?.VITE_SUPABASE_URL || 'https://ivrmxblrjbnswhwjougt.supabase.co',
-      key: customKey || supabaseKey || localStorage.getItem('wireman_supabase_key') || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1seyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1s'
-    };
-    if (!creds.url || !creds.key) {
-      setAuthError('Supabase project URL and API key are not configured.');
-      return;
-    }
-    const redirectUrl = encodeURIComponent(window.location.origin);
-    window.location.href = `${creds.url.replace(/\/$/, '')}/auth/v1/authorize?provider=google&redirect_to=${redirectUrl}`;
-  };
-
-  const handleSignOut = async () => {
-    const creds = getSupabaseCredentials();
-    const sessionStr = localStorage.getItem('wireman_supabase_session');
-    if (sessionStr && creds.url && creds.key) {
-      try {
-        const parsed = JSON.parse(sessionStr);
-        const token = parsed.session?.access_token;
-        if (token) {
-          const { signOutUser } = await import('./utils/syncService');
-          await signOutUser(creds.url, creds.key, token);
-        }
-      } catch (err) {
-        console.error('Sign out error:', err);
-      }
-    }
-    setCurrentUser(null);
-    localStorage.removeItem('wireman_supabase_session');
-    setSyncStatus('offline');
   };
 
   // Load Initial Data from localStorage
@@ -372,72 +259,13 @@ export default function App() {
     if (savedUrl) setSupabaseUrl(savedUrl);
     if (savedKey) setSupabaseKey(savedKey);
     
-    // Check if there is an OAuth redirect hash in the URL (from Google Sign-In)
-    if (window.location.hash) {
-      const hash = window.location.hash.substring(1);
-      const params = new URLSearchParams(hash);
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
-      const expiresAt = params.get('expires_at');
-      
-      if (accessToken) {
-        const url = savedUrl || import.meta.env?.VITE_SUPABASE_URL || 'https://ivrmxblrjbnswhwjougt.supabase.co';
-        const key = savedKey || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1seyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1s';
-        
-        setAuthLoading(true);
-        import('./utils/syncService').then(async ({ getUser }) => {
-          const userRes = await getUser(url, key, accessToken);
-          if (userRes.success) {
-            const user = userRes.user;
-            setCurrentUser(user);
-            localStorage.setItem('wireman_supabase_session', JSON.stringify({
-              user,
-              session: {
-                access_token: accessToken,
-                refresh_token: refreshToken,
-                expires_at: expiresAt
-              }
-            }));
-            // Clean up URL hash cleanly
-            window.history.replaceState(null, null, window.location.pathname);
-            triggerInitialSync(url, key, user.id);
-          } else {
-            console.error('Failed to fetch user after OAuth:', userRes.error);
-            setAuthError(userRes.error || 'Failed to authenticate Google user.');
-            setIsAuthOpen(true);
-          }
-          setAuthLoading(false);
-        }).catch(err => {
-          console.error('Exception fetching user after OAuth:', err);
-          setAuthError(err.message || 'Error processing Google session.');
-          setIsAuthOpen(true);
-          setAuthLoading(false);
-        });
-        return; // Skip loading standard saved session since we have a new active OAuth session
-      }
-    }
-
-    // Load and verify auth session
-    const savedSession = localStorage.getItem('wireman_supabase_session');
-    let activeUserId = null;
-    if (savedSession) {
-      try {
-        const parsed = JSON.parse(savedSession);
-        if (parsed.user) {
-          setCurrentUser(parsed.user);
-          activeUserId = parsed.user.id;
-        }
-      } catch (err) {
-        console.error('Failed to parse saved session:', err);
-      }
-    }
-
-    const url = savedUrl || import.meta.env?.VITE_SUPABASE_URL || 'https://ivrmxblrjbnswhwjougt.supabase.co';
-    const key = savedKey || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1seyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cm14YmxyamJuc3dod2pvdWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMjA1MTIsImV4cCI6MjA5ODc5NjUxMn0.V7dHk9xiCC6bxqKUhMQlMO8J-t8mVLHFOoXks5U2J1s';
+    const url = savedUrl || import.meta.env?.VITE_SUPABASE_URL || '';
+    const key = savedKey || import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY || '';
     if (url && key) {
-      triggerInitialSync(url, key, activeUserId);
+      triggerInitialSync(url, key, deviceId);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceId]);
 
   // Synchronize browser page title dynamically for correct PDF filenames
   useEffect(() => {
@@ -521,6 +349,46 @@ export default function App() {
         const filtered = quotations.filter(q => q.id !== id);
         saveToStorage('wireman_quotations', filtered, setQuotations);
       }
+    }
+  };
+
+  const handleDuplicateDocument = (doc) => {
+    const nextNum = getNextDocumentNumber(doc.docType);
+    const duplicatedDoc = {
+      ...doc,
+      id: `dup-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      docNumber: nextNum,
+      date: new Date().toISOString().split('T')[0],
+      status: doc.docType === 'Invoice' ? 'Sent' : 'Draft',
+    };
+    setEstimatorPreload(duplicatedDoc);
+    setCreatingDocType(doc.docType);
+  };
+
+  const handleConvertQuoteToInvoice = (quoteDoc) => {
+    const nextNum = getNextDocumentNumber('Invoice');
+    const convertedInvoice = {
+      id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      docType: 'Invoice',
+      docNumber: nextNum,
+      date: new Date().toISOString().split('T')[0],
+      validityDate: '',
+      status: 'Sent',
+      clientInfo: { ...quoteDoc.clientInfo },
+      items: quoteDoc.items.map(item => ({ ...item })),
+      terms: [...defaultTerms]
+    };
+    setEstimatorPreload(convertedInvoice);
+    setCreatingDocType('Invoice');
+  };
+
+  const handleUpdateDocStatus = (id, type, newStatus) => {
+    if (type === 'Invoice') {
+      const updated = invoices.map(i => i.id === id ? { ...i, status: newStatus } : i);
+      saveToStorage('wireman_invoices', updated, setInvoices);
+    } else {
+      const updated = quotations.map(q => q.id === id ? { ...q, status: newStatus } : q);
+      saveToStorage('wireman_quotations', updated, setQuotations);
     }
   };
 
@@ -651,6 +519,9 @@ export default function App() {
             }}
             onDeleteDoc={handleDeleteDocument}
             onViewDoc={(doc) => setViewingDoc(doc)}
+            onDuplicateDoc={handleDuplicateDocument}
+            onConvertQuoteToInvoice={handleConvertQuoteToInvoice}
+            onUpdateDocStatus={handleUpdateDocStatus}
             setCurrentTab={setCurrentTab}
           />
         );
@@ -663,60 +534,24 @@ export default function App() {
         );
       case 'invoices':
         return (
-          <div>
-            {/* Direct list of documents if not creating/editing/viewing */}
-            <div className="no-print page-header">
-              <div>
-                <h1 className="page-title">Quotations & GST Invoices</h1>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Review past transactions or generate new billing records.</p>
-              </div>
-              <div className="page-actions">
-                <button 
-                  onClick={() => {
-                    setEditingDoc(null);
-                    setEstimatorPreload(null);
-                    setCreatingDocType('Quotation');
-                  }} 
-                  className="btn btn-accent"
-                >
-                  Create Quote
-                </button>
-                <button 
-                  onClick={() => {
-                    setEditingDoc(null);
-                    setEstimatorPreload(null);
-                    setCreatingDocType('Invoice');
-                  }} 
-                  className="btn btn-primary"
-                >
-                  Create Invoice
-                </button>
-              </div>
-            </div>
-
-            <div className="no-print card" style={{ padding: '0.5rem 0' }}>
-              {/* Combine and render document items list */}
-              <Dashboard 
-                invoices={invoices}
-                quotations={quotations}
-                estimates={estimates}
-                printHistory={printHistory}
-                onClearHistory={() => saveToStorage('wireman_print_history', [], setPrintHistory)}
-                onCreateNew={(type) => {
-                  setEditingDoc(null);
-                  setEstimatorPreload(null);
-                  setCreatingDocType(type);
-                }}
-                onEditDoc={(doc) => {
-                  setEditingDoc(doc);
-                  setCreatingDocType(doc.docType);
-                }}
-                onDeleteDoc={handleDeleteDocument}
-                onViewDoc={(doc) => setViewingDoc(doc)}
-                setCurrentTab={setCurrentTab}
-              />
-            </div>
-          </div>
+          <DocumentList
+            invoices={invoices}
+            quotations={quotations}
+            onEditDoc={(doc) => {
+              setEditingDoc(doc);
+              setCreatingDocType(doc.docType);
+            }}
+            onDeleteDoc={handleDeleteDocument}
+            onViewDoc={(doc) => setViewingDoc(doc)}
+            onDuplicateDoc={handleDuplicateDocument}
+            onConvertQuoteToInvoice={handleConvertQuoteToInvoice}
+            onUpdateDocStatus={handleUpdateDocStatus}
+            onCreateNew={(type) => {
+              setEditingDoc(null);
+              setEstimatorPreload(null);
+              setCreatingDocType(type);
+            }}
+          />
         );
       case 'clients':
         return (
@@ -749,10 +584,8 @@ export default function App() {
             supabaseKey={supabaseKey}
             onSaveSyncCredentials={handleSaveSyncCredentials}
             syncStatus={syncStatus}
-            currentUser={currentUser}
-            onOpenAuth={() => { setIsAuthOpen(true); setAuthError(''); }}
-            onSignOut={handleSignOut}
-            onTriggerSync={() => { const creds = getSupabaseCredentials(); triggerInitialSync(creds.url, creds.key, currentUser?.id); }}
+            deviceId={deviceId}
+            onTriggerSync={() => { const creds = getSupabaseCredentials(); triggerInitialSync(creds.url, creds.key, deviceId); }}
           />
         );
       default:
@@ -832,23 +665,9 @@ export default function App() {
         setCurrentTab={setCurrentTab}
         companyName={companyProfile.name}
         syncStatus={syncStatus}
-        currentUser={currentUser}
-        onOpenAuth={() => { setIsAuthOpen(true); setAuthError(''); }}
-        onSignOut={handleSignOut}
       >
         {renderTabContent()}
       </Layout>
-      <Auth 
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        onLogin={handleLogin}
-        onSignUp={handleSignUp}
-        onGoogleSignIn={handleGoogleSignIn}
-        error={authError}
-        loading={authLoading}
-        supabaseUrl={supabaseUrl}
-        supabaseKey={supabaseKey}
-      />
     </>
   );
 }

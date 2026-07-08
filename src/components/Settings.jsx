@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Save, Download, Upload, AlertCircle, FileText, User, RefreshCw, LogOut, CheckCircle } from 'lucide-react';
+import { Save, Download, Upload, AlertCircle, FileText } from 'lucide-react';
 
 export default function SettingsView({ 
   companyProfile = {}, 
@@ -12,10 +11,7 @@ export default function SettingsView({
   supabaseUrl = '',
   supabaseKey = '',
   onSaveSyncCredentials,
-  syncStatus = 'offline',
-  currentUser = null,
-  onOpenAuth,
-  onSignOut,
+  deviceId = '',
   onTriggerSync
 }) {
   // Company state
@@ -125,7 +121,7 @@ export default function SettingsView({
           setMessage('Backup imported successfully!');
           setTimeout(() => setMessage(''), 4000);
         }
-      } catch (err) {
+      } catch {
         setError('Failed to parse backup file. Please make sure it is a valid JSON backup.');
         setTimeout(() => setError(''), 4000);
       }
@@ -410,7 +406,7 @@ export default function SettingsView({
               Cloud Sync & Database Sync
             </h3>
             
-            {currentUser ? (
+            {(supabaseUrl && supabaseKey) ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ 
                   backgroundColor: '#ecfdf5', 
@@ -436,9 +432,12 @@ export default function SettingsView({
                     marginTop: '2px'
                   }}>✓</div>
                   <div>
-                    <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#065f46' }}>Connected to Cloud Sync</h4>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#065f46' }}>Database Sync Enabled</h4>
                     <p style={{ fontSize: '0.75rem', color: '#047857', marginTop: '2px' }}>
-                      Logged in as: <strong style={{ wordBreak: 'break-all' }}>{currentUser.email}</strong>
+                      Device ID: <strong style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>{deviceId}</strong>
+                    </p>
+                    <p style={{ fontSize: '0.7rem', color: '#065f46', marginTop: '4px' }}>
+                      Data is backed up privately to your cloud database under this device's ID.
                     </p>
                   </div>
                 </div>
@@ -454,27 +453,26 @@ export default function SettingsView({
                   </button>
                   <button 
                     type="button" 
-                    onClick={onSignOut}
+                    onClick={() => {
+                      onSaveSyncCredentials('', '');
+                      setSyncUrl('');
+                      setSyncKey('');
+                    }}
                     className="btn btn-secondary btn-sm"
                     style={{ flex: 1, fontSize: '0.8rem', display: 'inline-flex', gap: '6px', justifyContent: 'center', color: 'var(--danger)' }}
                   >
-                    Sign Out
+                    Disconnect
                   </button>
                 </div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1.25rem' }}>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                  Sign in or create a cloud account to automatically save your data and access it from any device or browser securely.
+                  By default, your data is saved only on this system. To enable automatic cloud backup and sync, expand the <strong>Advanced Database Settings</strong> below and connect a Supabase database.
                 </p>
-                <button
-                  type="button"
-                  onClick={onOpenAuth}
-                  className="btn btn-primary"
-                  style={{ width: '100%', fontSize: '0.85rem', padding: '8px 12px' }}
-                >
-                  Login or Create Account
-                </button>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  System ID: <span style={{ fontFamily: 'monospace' }}>{deviceId}</span>
+                </p>
               </div>
             )}
 

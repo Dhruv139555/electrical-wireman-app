@@ -9,7 +9,10 @@ import {
   Search, 
   Eye, 
   Edit3, 
-  Trash2 
+  Trash2,
+  Copy,
+  ArrowRight,
+  Check
 } from 'lucide-react';
 
 // Reusable animated SVG Donut Chart component
@@ -105,6 +108,9 @@ export default function Dashboard({
   onEditDoc,
   onDeleteDoc,
   onViewDoc,
+  onDuplicateDoc,
+  onConvertQuoteToInvoice,
+  onUpdateDocStatus,
   setCurrentTab 
 }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,6 +132,13 @@ export default function Dashboard({
   
   const quotesCount = quotations.length;
   const activeEstimatesCount = estimates.length;
+
+  // Count calculations
+  const totalInvoicesCount = invoices.length;
+  const pendingInvoicesCount = invoices.filter(item => item.status !== 'Paid' && item.status !== 'Cancelled').length;
+  const paidInvoicesCount = invoices.filter(item => item.status === 'Paid').length;
+  const approvedQuotesCount = quotations.filter(item => item.status === 'Approved').length;
+  const pendingQuotesCount = quotations.filter(item => item.status !== 'Approved' && item.status !== 'Declined').length;
 
   // Monthly Revenue Aggregation
   const monthlyData = {};
@@ -253,6 +266,9 @@ export default function Dashboard({
     return matchesSearch && matchesType;
   });
 
+  // Limit recent list on dashboard home to 8 items
+  const recentDocuments = filteredDocuments.slice(0, 8);
+
   return (
     <div className="no-print">
       <div className="page-header">
@@ -279,6 +295,9 @@ export default function Dashboard({
           <div className="stat-info">
             <span className="stat-label">Total Invoiced</span>
             <span className="stat-value">₹{totalInvoiced.toLocaleString('en-IN')}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
+              {totalInvoicesCount} Invoice{totalInvoicesCount !== 1 ? 's' : ''} Created
+            </span>
           </div>
         </div>
 
@@ -289,6 +308,9 @@ export default function Dashboard({
           <div className="stat-info">
             <span className="stat-label">Outstanding Bal.</span>
             <span className="stat-value">₹{totalOutstanding.toLocaleString('en-IN')}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
+              {pendingInvoicesCount} Pending Invoice{pendingInvoicesCount !== 1 ? 's' : ''}
+            </span>
           </div>
         </div>
 
@@ -299,6 +321,9 @@ export default function Dashboard({
           <div className="stat-info">
             <span className="stat-label">Total Paid/Revenue</span>
             <span className="stat-value">₹{totalPaid.toLocaleString('en-IN')}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
+              {paidInvoicesCount} Paid Invoice{paidInvoicesCount !== 1 ? 's' : ''}
+            </span>
           </div>
         </div>
 
@@ -309,6 +334,9 @@ export default function Dashboard({
           <div className="stat-info">
             <span className="stat-label">Quotes & Estimates</span>
             <span className="stat-value">{quotesCount} Q / {activeEstimatesCount} E</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
+              {approvedQuotesCount} Approved / {pendingQuotesCount} Pending
+            </span>
           </div>
         </div>
       </div>
@@ -370,6 +398,13 @@ export default function Dashboard({
               style={{ padding: '6px 12px', fontSize: '0.85rem' }}
             >
               Pipeline & Status
+            </button>
+            <button 
+              onClick={() => setAnalyticsTab('counts')} 
+              className={`tab-btn ${analyticsTab === 'counts' ? 'active' : ''}`}
+              style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+            >
+              Document Counts
             </button>
           </div>
         </div>
@@ -754,6 +789,163 @@ export default function Dashboard({
             </div>
           </div>
         )}
+
+        {/* Tab 4: Document Counts (Live Chart) */}
+        {analyticsTab === 'counts' && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* Custom SVG Bar Chart for counts */}
+              <div style={{ padding: '1.25rem', backgroundColor: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', minWidth: '280px' }}>
+                <h4 style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '1.25rem', color: 'var(--primary)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Document Volume (Counts)
+                </h4>
+                
+                <svg viewBox="0 0 400 220" width="100%" height="220" style={{ overflow: 'visible' }}>
+                  {/* Grid Lines for count scale */}
+                  {(() => {
+                    const maxVal = Math.max(quotesCount, totalInvoicesCount, paidInvoicesCount, pendingInvoicesCount, 4);
+                    // Determine grid increments
+                    const step = Math.ceil(maxVal / 4) || 1;
+                    const lines = Array.from({ length: 5 }, (_, i) => i * step);
+                    const maxGridVal = lines[4];
+
+                    return (
+                      <>
+                        {lines.map((val, i) => {
+                          const pct = val / maxGridVal;
+                          const yVal = 180 - pct * 140;
+
+                          return (
+                            <g key={i}>
+                              <line x1="50" y1={yVal} x2="380" y2={yVal} stroke="var(--border-color)" strokeWidth="1" strokeDasharray="4 4" />
+                              <text x="40" y={yVal + 3} textAnchor="end" fontSize="9" fill="var(--text-muted)" fontWeight="600">
+                                {val}
+                              </text>
+                            </g>
+                          );
+                        })}
+
+                        {/* Bars for each count category */}
+                        {(() => {
+                          const barWidth = 40;
+                          const spacing = 45;
+                          const startX = 75;
+
+                          const categories = [
+                            { label: 'Quotes', count: quotesCount, color: 'var(--primary)', short: 'Quotes' },
+                            { label: 'Invoices', count: totalInvoicesCount, color: '#8b5cf6', short: 'Bills' },
+                            { label: 'Paid Bills', count: paidInvoicesCount, color: 'var(--success)', short: 'Paid' },
+                            { label: 'Pending Bills', count: pendingInvoicesCount, color: 'var(--accent)', short: 'Pending' }
+                          ];
+
+                          return categories.map((cat, idx) => {
+                            const x = startX + idx * (barWidth + spacing);
+                            const barHeight = maxGridVal > 0 ? (cat.count / maxGridVal) * 140 : 0;
+                            const y = 180 - barHeight;
+
+                            return (
+                              <g key={idx}>
+                                {/* Animated count bar */}
+                                <rect
+                                  x={x}
+                                  y={y}
+                                  width={barWidth}
+                                  height={barHeight}
+                                  fill={cat.color}
+                                  rx="4"
+                                  style={{ transition: 'all 0.4s ease-out' }}
+                                />
+                                
+                                {/* Count value text on top of the bar */}
+                                <text
+                                  x={x + barWidth / 2}
+                                  y={y - 8}
+                                  textAnchor="middle"
+                                  fontSize="10"
+                                  fontWeight="700"
+                                  fill="var(--text-main)"
+                                >
+                                  {cat.count}
+                                </text>
+
+                                {/* Bottom X-axis label */}
+                                <text
+                                  x={x + barWidth / 2}
+                                  y="200"
+                                  textAnchor="middle"
+                                  fontSize="9.5"
+                                  fontWeight="600"
+                                  fill="var(--text-muted)"
+                                >
+                                  {cat.short}
+                                </text>
+                              </g>
+                            );
+                          });
+                        })()}
+                      </>
+                    );
+                  })()}
+                </svg>
+              </div>
+
+              {/* Counts Table Breakdown */}
+              <div>
+                <table className="document-table" style={{ fontSize: '0.85rem', margin: 0 }}>
+                  <thead>
+                    <tr>
+                      <th>Document Category</th>
+                      <th style={{ textAlign: 'center' }}>Total Count</th>
+                      <th style={{ textAlign: 'center' }}>Percentage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: '8px', height: '8px', backgroundColor: 'var(--primary)', borderRadius: '50%' }}></span>
+                        Quotations Made
+                      </td>
+                      <td style={{ textAlign: 'center', fontWeight: 700 }}>{quotesCount}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                        {quotesCount + totalInvoicesCount > 0 ? `${Math.round((quotesCount / (quotesCount + totalInvoicesCount)) * 100)}%` : '0%'} of files
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: '8px', height: '8px', backgroundColor: '#8b5cf6', borderRadius: '50%' }}></span>
+                        Tax Invoices Made
+                      </td>
+                      <td style={{ textAlign: 'center', fontWeight: 700 }}>{totalInvoicesCount}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                        {quotesCount + totalInvoicesCount > 0 ? `${Math.round((totalInvoicesCount / (quotesCount + totalInvoicesCount)) * 100)}%` : '0%'} of files
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: '8px', height: '8px', backgroundColor: 'var(--success)', borderRadius: '50%' }}></span>
+                        Paid Invoices (Revenue)
+                      </td>
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--success)' }}>{paidInvoicesCount}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--success)', fontWeight: 600 }}>
+                        {totalInvoicesCount > 0 ? `${Math.round((paidInvoicesCount / totalInvoicesCount) * 100)}%` : '0%'} collection rate
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: '8px', height: '8px', backgroundColor: 'var(--accent)', borderRadius: '50%' }}></span>
+                        Pending Invoices (Unpaid)
+                      </td>
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--accent-hover)' }}>{pendingInvoicesCount}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--accent-hover)', fontWeight: 600 }}>
+                        {totalInvoicesCount > 0 ? `${Math.round((pendingInvoicesCount / totalInvoicesCount) * 100)}%` : '0%'} pending rate
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Two Column Layout: Main documents list + Print History */}
@@ -814,7 +1006,7 @@ export default function Dashboard({
             </div>
           </div>
 
-          {filteredDocuments.length === 0 ? (
+          {recentDocuments.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
               <FileText size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
               <p>No documents found matching your search.</p>
@@ -835,57 +1027,102 @@ export default function Dashboard({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredDocuments.map((doc) => (
-                    <tr key={`${doc.docType}-${doc.id}`}>
-                      <td style={{ fontWeight: 600 }}>#{doc.docNumber}</td>
-                      <td>
-                        <span className={`status-badge ${doc.docType.toLowerCase()}`}>
-                          {doc.docType}
-                        </span>
-                      </td>
-                      <td>
-                        <div>{doc.clientInfo?.name || 'Walk-in Client'}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {doc.clientInfo?.city}, {doc.clientInfo?.state}
-                        </div>
-                      </td>
-                      <td>{new Date(doc.date).toLocaleDateString('en-IN')}</td>
-                      <td style={{ fontWeight: 600 }}>₹{doc.grandTotal?.toLocaleString('en-IN')}</td>
-                      <td>
-                        <span className={`status-badge ${doc.status.toLowerCase()}`}>
-                          {doc.status}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                          <button 
-                            onClick={() => onViewDoc(doc)} 
-                            className="btn btn-secondary btn-sm"
-                            title="View / Print Document"
-                            style={{ padding: '4px 8px' }}
-                          >
-                            <Eye size={13} />
-                          </button>
-                          <button 
-                            onClick={() => onEditDoc(doc)} 
-                            className="btn btn-secondary btn-sm"
-                            title="Edit Document"
-                            style={{ padding: '4px 8px' }}
-                          >
-                            <Edit3 size={13} />
-                          </button>
-                          <button 
-                            onClick={() => onDeleteDoc(doc.id, doc.docType)} 
-                            className="btn btn-secondary btn-sm"
-                            title="Delete Document"
-                            style={{ padding: '4px 8px', color: 'var(--danger)' }}
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {recentDocuments.map((doc) => {
+                    const isUnpaidInvoice = doc.docType === 'Invoice' && doc.status !== 'Paid' && doc.status !== 'Cancelled';
+                    const isUnapprovedQuote = doc.docType === 'Quotation' && doc.status !== 'Approved' && doc.status !== 'Declined';
+                    const showQuickStatus = isUnpaidInvoice || isUnapprovedQuote;
+
+                    return (
+                      <tr key={`${doc.docType}-${doc.id}`}>
+                        <td style={{ fontWeight: 600 }}>#{doc.docNumber}</td>
+                        <td>
+                          <span className={`status-badge ${doc.docType.toLowerCase()}`}>
+                            {doc.docType}
+                          </span>
+                        </td>
+                        <td>
+                          <div>{doc.clientInfo?.name || 'Walk-in Client'}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {doc.clientInfo?.city}, {doc.clientInfo?.state}
+                          </div>
+                        </td>
+                        <td>{new Date(doc.date).toLocaleDateString('en-IN')}</td>
+                        <td style={{ fontWeight: 600 }}>₹{doc.grandTotal?.toLocaleString('en-IN')}</td>
+                        <td>
+                          <span className={`status-badge ${doc.status.toLowerCase().replace(' ', '-')}`}>
+                            {doc.status}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                            {/* View / Print */}
+                            <button 
+                              onClick={() => onViewDoc(doc)} 
+                              className="btn btn-secondary btn-sm"
+                              title="View / Print Document"
+                              style={{ padding: '4px 8px' }}
+                            >
+                              <Eye size={13} />
+                            </button>
+
+                            {/* Edit */}
+                            <button 
+                              onClick={() => onEditDoc(doc)} 
+                              className="btn btn-secondary btn-sm"
+                              title="Edit Document"
+                              style={{ padding: '4px 8px' }}
+                            >
+                              <Edit3 size={13} />
+                            </button>
+
+                            {/* Duplicate */}
+                            <button 
+                              onClick={() => onDuplicateDoc(doc)} 
+                              className="btn btn-secondary btn-sm"
+                              title="Duplicate Document"
+                              style={{ padding: '4px 8px' }}
+                            >
+                              <Copy size={13} />
+                            </button>
+
+                            {/* Convert Quotation to Invoice */}
+                            {doc.docType === 'Quotation' && (
+                              <button 
+                                onClick={() => onConvertQuoteToInvoice(doc)} 
+                                className="btn btn-secondary btn-sm"
+                                title="Convert to GST Invoice"
+                                style={{ padding: '4px 8px', color: 'var(--success)' }}
+                              >
+                                <ArrowRight size={13} />
+                              </button>
+                            )}
+
+                            {/* Quick Status Checkmark */}
+                            {showQuickStatus && (
+                              <button 
+                                onClick={() => onUpdateDocStatus(doc.id, doc.docType, doc.docType === 'Invoice' ? 'Paid' : 'Approved')} 
+                                className="btn btn-secondary btn-sm"
+                                title={doc.docType === 'Invoice' ? "Mark as Paid" : "Mark as Approved"}
+                                style={{ padding: '4px 8px', color: 'var(--success)' }}
+                              >
+                                <Check size={13} />
+                              </button>
+                            )}
+
+                            {/* Delete */}
+                            <button 
+                              onClick={() => onDeleteDoc(doc.id, doc.docType)} 
+                              className="btn btn-secondary btn-sm"
+                              title="Delete Document"
+                              style={{ padding: '4px 8px', color: 'var(--danger)' }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -918,32 +1155,47 @@ export default function Dashboard({
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
-              {printHistory.map((log) => (
-                <div 
-                  key={log.id} 
-                  style={{ 
-                    padding: '8px 10px', 
-                    backgroundColor: 'var(--bg-app)', 
-                    borderRadius: '6px', 
-                    borderLeft: '3px solid var(--primary)',
-                    fontSize: '0.8rem'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, marginBottom: '2px' }}>
-                    <span>{log.docType} #{log.docNumber}</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 'normal' }}>
-                      {new Date(log.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+              {printHistory.map((log) => {
+                const doc = log.docType === 'Invoice' 
+                  ? invoices.find(i => i.id === log.docId)
+                  : quotations.find(q => q.id === log.docId);
+                const isClickable = !!doc;
+
+                return (
+                  <div 
+                    key={log.id} 
+                    onClick={() => isClickable && onViewDoc(doc)}
+                    style={{ 
+                      padding: '8px 10px', 
+                      backgroundColor: 'var(--bg-app)', 
+                      borderRadius: '6px', 
+                      borderLeft: '3px solid var(--primary)',
+                      fontSize: '0.8rem',
+                      cursor: isClickable ? 'pointer' : 'default',
+                      opacity: isClickable ? 1 : 0.7,
+                      transition: 'background-color 0.2s',
+                      position: 'relative'
+                    }}
+                    title={isClickable ? "Click to view / re-download document" : ""}
+                    onMouseOver={(e) => { if (isClickable) e.currentTarget.style.backgroundColor = 'var(--border-color)'; }}
+                    onMouseOut={(e) => { if (isClickable) e.currentTarget.style.backgroundColor = 'var(--bg-app)'; }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, marginBottom: '2px' }}>
+                      <span>{log.docType} #{log.docNumber}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 'normal' }}>
+                        {new Date(log.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <div style={{ color: 'var(--text-main)', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }}>
+                      {log.clientName}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      <span>Total: ₹{log.grandTotal?.toLocaleString('en-IN')}</span>
+                      <span>{new Date(log.timestamp).toLocaleDateString('en-IN')}</span>
+                    </div>
                   </div>
-                  <div style={{ color: 'var(--text-main)', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }}>
-                    {log.clientName}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    <span>Total: ₹{log.grandTotal?.toLocaleString('en-IN')}</span>
-                    <span>{new Date(log.timestamp).toLocaleDateString('en-IN')}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -1,4 +1,3 @@
-import React from 'react';
 import { 
   Home, 
   Zap, 
@@ -6,10 +5,7 @@ import {
   Users, 
   Layers, 
   Settings, 
-  Menu,
-  ChevronRight,
-  LogOut,
-  User
+  ChevronRight
 } from 'lucide-react';
 import { LOGO_BASE64 } from '../utils/logoBase64';
 
@@ -18,10 +14,7 @@ export default function Layout({
   currentTab, 
   setCurrentTab, 
   companyName, 
-  syncStatus = 'offline',
-  currentUser = null,
-  onOpenAuth,
-  onSignOut
+  syncStatus = 'offline'
 }) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -90,64 +83,6 @@ export default function Layout({
         </nav>
 
         <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {currentUser ? (
-            <div style={{ 
-              borderBottom: '1px solid #1e293b', 
-              paddingBottom: '8px', 
-              marginBottom: '4px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              textAlign: 'left'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#94a3b8' }} title={currentUser.email}>
-                <User size={12} style={{ flexShrink: 0 }} />
-                <span style={{ 
-                  textOverflow: 'ellipsis', 
-                  overflow: 'hidden', 
-                  whiteSpace: 'nowrap',
-                  maxWidth: '180px'
-                }}>
-                  {currentUser.email}
-                </span>
-              </div>
-              <button 
-                onClick={onSignOut}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--danger)',
-                  fontSize: '0.7rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  cursor: 'pointer',
-                  padding: 0,
-                  fontWeight: 600,
-                  opacity: 0.8
-                }}
-                onMouseOver={(e) => e.target.style.opacity = '1'}
-                onMouseOut={(e) => e.target.style.opacity = '0.8'}
-              >
-                <LogOut size={12} /> Sign Out
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={onOpenAuth}
-              className="btn btn-primary btn-sm"
-              style={{ 
-                width: '100%', 
-                fontSize: '0.75rem', 
-                padding: '6px 10px',
-                marginBottom: '4px',
-                borderRadius: 'var(--radius-sm)'
-              }}
-            >
-              Sign In to Sync
-            </button>
-          )}
-
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.65rem' }}>
             <p style={{ margin: 0 }}>© 2026 Wireman</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

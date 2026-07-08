@@ -3,9 +3,9 @@ import { formatDate } from '../utils/helper';
 import { LOGO_BASE64 } from '../utils/logoBase64';
 
 export default function InvoicePrint({ document, companyProfile, onPrint }) {
-  if (!document) return null;
-
   const [isDownloading, setIsDownloading] = useState(false);
+
+  if (!document) return null;
   const isInvoice = document.docType === 'Invoice';
   const { clientInfo = {}, items = [], terms = [] } = document;
   const profile = companyProfile || {};
